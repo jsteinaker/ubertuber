@@ -21,6 +21,7 @@
 #include <Menu.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
+#include <OptionPopUp.h>
 #include <String.h>
 #include <StringView.h>
 #include <TextControl.h>
@@ -41,6 +42,7 @@ enum {
 	msgCLEAN	= 'clen',
 	msgCLEARURL	= 'curl',
 	msgEDIT		= 'edit',
+	msgFORMAT	= 'form',
 	msgOPENURL	= 'ourl',
 	msgPLAY		= 'ypla',
 	msgSAVE		= 'esav',
@@ -91,6 +93,8 @@ private:
 		BMenuItem*		fSaveMenu;
 		BMenuItem*		fClearURLMenu;
 		BMenuItem*		fOpenURLMenu;
+		
+		BOptionPopUp*	fFormatOption;
 
 		BString			fClipTitle;
 		BString*		fFilename;

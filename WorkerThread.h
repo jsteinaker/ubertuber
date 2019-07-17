@@ -12,6 +12,8 @@
 #ifndef WORKERTHREAD_H
 #define WORKERTHREAD_H
 
+#define BEST_AUDIO	1
+
 #include <Looper.h>
 #include <Messenger.h>
 #include <String.h>
@@ -33,7 +35,7 @@ public:
 		void			MessageReceived(BMessage* message);
 		
 		BString			_GetTitle(BString url);
-		bool			_GetClip(BString url);
+		bool			_GetClip(BString url, int32 format);
 private:
 		BMessenger		fOwner;
 };

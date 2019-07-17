@@ -38,8 +38,9 @@ WorkerThread::MessageReceived(BMessage* message)
 		case msgGETCLIP:
 		{
 			BString url;
-			if (message->FindString("url", &url) == B_OK)
-				_GetClip(url);
+			int32 format;
+			if (message->FindString("url", &url) == B_OK && message->FindInt32("format", &format) == B_OK)
+				_GetClip(url, format);
 			break;
 		}
 		default:
@@ -71,13 +72,13 @@ WorkerThread::_GetTitle(BString url)
 
 
 bool
-WorkerThread::_GetClip(BString url)
+WorkerThread::_GetClip(BString url, int32 format)
 {
 	BString* command = new BString(
 	"mkdir -p /tmp/ubertuber ; "
 	"cd /tmp/ubertuber ; "
 	"hey application/x-vnd.UberTuber down ; "
-	"youtube-dl --continue --restrict-filenames --no-part --no-cache-dir --format best %URL% ; "
+	"youtube-dl --continue --restrict-filenames --no-part --no-cache-dir --format %FORMAT% %URL% ; "
 	"while [ -n \"$(%TEST%)\" ] ; do " // wait for script to finish/aborted
 	"sleep 2 ; "
 	"done ; "
@@ -93,6 +94,17 @@ WorkerThread::_GetClip(BString url)
 
 	command->ReplaceAll("%TEST%", threadtest.String());
 	command->ReplaceAll("%URL%", url.String());
+	
+	switch (format) {
+		case BEST_AUDIO:
+		{
+			command->ReplaceAll("%FORMAT%", "bestaudio");
+			break;
+		}
+		default:
+			command->ReplaceAll("%FORMAT%", "best");
+	}
+	
 
 	system(command->String());
 	return true;
