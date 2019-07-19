@@ -15,7 +15,6 @@
 #include <Alert.h>
 #include <Application.h>
 #include <Catalog.h>
-#include <Clipboard.h>
 #include <ControlLook.h>
 #include <Directory.h>
 #include <Entry.h>
@@ -69,7 +68,7 @@ public:
 MainWindow::MainWindow()
 	:
 	BWindow(BRect(), B_TRANSLATE_SYSTEM_NAME("UberTuber"), B_TITLED_WINDOW,
-		B_NOT_V_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS |
+		B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS |
 		B_QUIT_ON_WINDOW_CLOSE | B_AUTO_UPDATE_SIZE_LIMITS),
 	fSaveFilePanel(NULL),
 	fAbortedFlag(false),
@@ -84,12 +83,12 @@ MainWindow::MainWindow()
 	_BuildMenu();
 	_BuildLayout();
 
-	fURLBox->MakeFocus(true);
+	fMultiUrlBox->MakeFocus(true);
 	fPlayButton->MakeDefault(true);
 
 	if (fSettings.WindowPosition() == BRect(-1, -1, -1, -1)) {
 		CenterOnScreen();
-		ResizeTo(400, 50);
+		ResizeTo(400, 150);
 	} else {
 		BRect frame = fSettings.WindowPosition();
 		MoveTo(frame.LeftTop());
@@ -100,11 +99,8 @@ MainWindow::MainWindow()
 		if (!screen.Frame().InsetByCopy(10, 10).Intersects(Frame()))
 			CenterOnScreen();
 	}
-	WatchMonitoredSitesList();
-	be_clipboard->StartWatching(this);
-	PostMessage(B_CLIPBOARD_CHANGED);
 
-	fURLBox->SetText("");
+	fMultiUrlBox->SetText("");
 }
 
 
@@ -162,9 +158,9 @@ MainWindow::_BuildMenu()
 void
 MainWindow::_BuildLayout()
 {
-	fURLBox = new BTextControl("urlbox", B_TRANSLATE("URL:"), " ", NULL);
-	fURLBox->SetModificationMessage(new BMessage(msgURL));
-
+	fUrlTitle = new BStringView("urltitle", B_TRANSLATE("Paste URL(s) here"));
+	fMultiUrlBox = new BTextView("multiurlbox");
+	
 	fTitleView = new BStringView("title", " ");
 	fTitleView->SetFontSize(be_plain_font->Size() - 2);
 	fTitleView->SetHighColor(tint_color(ui_color(B_CONTROL_TEXT_COLOR), 0.7));
@@ -186,7 +182,7 @@ MainWindow::_BuildLayout()
 
 	fSaveButton = new BButton("savebutton", B_TRANSLATE("Save as" B_UTF8_ELLIPSIS),
 		new BMessage(msgSAVE));
-	fSaveButton->SetEnabled(false);
+	fSaveButton->SetEnabled(true);
 
 	BFont font;
 	float spacing = be_control_look->DefaultItemSpacing();
@@ -194,8 +190,12 @@ MainWindow::_BuildLayout()
 	BLayoutBuilder::Group<>(this, B_VERTICAL, 0)
 		.Add(fMenuBar)
 		.AddGroup(B_HORIZONTAL, spacing)
-			.Add(fURLBox)
+			.Add(fUrlTitle)
 			.SetInsets(spacing, spacing, spacing, 0)
+		.End()
+		.AddGroup(B_HORIZONTAL, spacing)
+			.Add(fMultiUrlBox)
+			.SetInsets(spacing, 0, spacing, 0)
 		.End()
 		.AddGroup(B_HORIZONTAL, 0)
 			.AddStrut(font.StringWidth("URL:") + be_control_look->DefaultLabelSpacing())
@@ -271,37 +271,6 @@ MainWindow::MessageReceived(BMessage* msg)
 			}
 			break;
 		}
-		case B_CLIPBOARD_CHANGED:
-		{
-			BString clipboardString(GetClipboard());
-			BString urlString(fURLBox->Text());
-
-			if (!urlString.ICompare(clipboardString)) {
-				printf("Same contents: break!\n");
-				break;
-			}
-
-			if (fSettings.ValidURL(clipboardString) == false) {
-				printf("Not valid: break!\n");
-				break;
-			}
-
-			fURLBox->SetText(clipboardString.String());
-			
-			if (!fGetFlag) {
-				fPlayButton->SetEnabled(true);
-				fSaveButton->SetEnabled(true);
-				fPlayMenu->SetEnabled(true);
-				fSaveMenu->SetEnabled(true);
-
-				ResetFlags();
-
-				if (fSettings.StateAuto())
-					PostMessage(msgPLAY);
-			}
-			SetStatus(B_TRANSLATE("Auto-inserted URL"));
-			break;
-		}
 		
 		case msgSAVE:
 		{
@@ -336,7 +305,7 @@ MainWindow::MessageReceived(BMessage* msg)
 
 				fSaveFilePanel->SetRefFilter(new DirectoryFilter);
 			}
-			fURL = new BString(fURLBox->Text());
+			fURL = new BString(fMultiUrlBox->Text());
 			fSaveFilePanel->Show();
 			break;
 		}
@@ -460,14 +429,14 @@ MainWindow::MessageReceived(BMessage* msg)
 			fSaveButton->SetEnabled(true);
 			fPlayMenu->SetEnabled(true);
 			fSaveMenu->SetEnabled(true);
-			fURLBox->SetEnabled(true);
+			//fMultiUrlBox->SetEnabled(true);
 			ResetFlags();
 			fAbortedFlag = true;
 			break;
 		}
 		case msgPLAY:
 		{
-			fURL = new BString(fURLBox->Text());
+			fURL = new BString(fMultiUrlBox->Text());
 			
 			if (!fGetFlag && !fGotClipFlag)
 				GetClip();
@@ -490,7 +459,7 @@ MainWindow::MessageReceived(BMessage* msg)
 		case msgURL:
 		{
 			if (!fGetFlag) {
-				int state = (fURLBox->TextView()->TextLength() > 0) ? true : false;
+				int state = (fMultiUrlBox->TextLength() > 0) ? true : false;
 				fPlayButton->SetEnabled(state);
 				fSaveButton->SetEnabled(state);
 				fPlayMenu->SetEnabled(state);
@@ -517,13 +486,13 @@ MainWindow::MessageReceived(BMessage* msg)
 		}
 		case msgCLEARURL:
 		{
-			fURLBox->SetText("");
+			fMultiUrlBox->SetText("");
 			break;
 		}
 		case msgOPENURL:
 		{
 			BString command("open %URL%");
-			command.ReplaceAll("%URL%", fURLBox->Text());
+			command.ReplaceAll("%URL%", fMultiUrlBox->Text());
 			system(command);
 			break;
 		}
@@ -548,7 +517,7 @@ MainWindow::MessageReceived(BMessage* msg)
 				fAbortMenu->SetEnabled(false);
 				fAbortButton->SetEnabled(false);
 			}
-			fURLBox->SetEnabled(true);
+			//fMultiUrlBox->SetEnabled(true);
 			ResetFlags();
 			break;
 		}
@@ -562,7 +531,7 @@ MainWindow::MessageReceived(BMessage* msg)
 			fGotClipFlag = true;
 			if (fSaveIt)
 				SaveClip();
-			fURLBox->SetEnabled(true);
+			//fMultiUrlBox->SetEnabled(true);
 			break;
 		}
 		case statFINISH_PLAY:
@@ -663,7 +632,7 @@ MainWindow::FrameResized(float width, float height)
 void
 MainWindow::TruncateTitle()
 {
-	float widthURL(fURLBox->Bounds().Width());
+	float widthURL(fMultiUrlBox->Bounds().Width());
 	BString* title = new BString(fClipTitle);
 	fTitleView->TruncateString(title, B_TRUNCATE_END, widthURL - 120.0);
 	fTitleView->SetText(title->String());
@@ -683,7 +652,7 @@ MainWindow::URLofFile(entry_ref &ref)
 	if (readBytes < 1)
 		SetStatus(B_TRANSLATE("No URL found"));
 	else {
-		fURLBox->SetText(buffer);
+		fMultiUrlBox->SetText(buffer);
 		if (!fGetFlag) {
 			fPlayButton->SetEnabled(true);
 			fSaveButton->SetEnabled(true);
@@ -753,30 +722,12 @@ MainWindow::SetStatus(BString text)
 void
 MainWindow::SetURL(BString* url)
 {
-	fURLBox->SetText(url->String());
+	fMultiUrlBox->SetText(url->String());
 	return;
 }
 
 
 // #pragma mark -
-
-
-BString
-MainWindow::GetClipboard()
-{
-	const char* text;
-	ssize_t textLen;
-	BMessage* clipboard;
-	if (be_clipboard->Lock()) {
-		if ((clipboard = be_clipboard->Data()))
-			clipboard->FindData("text/plain", B_MIME_TYPE,
-				(const void **)&text, &textLen);
-		be_clipboard->Unlock();
-	}
-	BString clipboardString(text, textLen);
-	return clipboardString;
-}
-
 
 void
 MainWindow::GetTitle()
@@ -807,7 +758,7 @@ MainWindow::GetClip()
 	fAbortButton->SetEnabled(fSaveIt);
 	fAbortMenu->SetEnabled(fSaveIt);
 
-	fURLBox->SetEnabled(false);
+	//fMultiUrlBox->SetEnabled(false);
 	return true;
 }
 

@@ -24,7 +24,7 @@
 #include <OptionPopUp.h>
 #include <String.h>
 #include <StringView.h>
-#include <TextControl.h>
+#include <TextView.h>
 #include <Window.h>
 
 enum {
@@ -68,7 +68,6 @@ private:
 		status_t		WatchMonitoredSitesList();
 		bool			GetClip();
 		void			GetTitle();
-		BString			GetClipboard();
 		void			KillThread(char* command);
 		void			ResetFlags();
 		void			SetStatus(BString text);
@@ -104,7 +103,8 @@ private:
 
 		BStringView*	fStatusView;
 		BStringView*	fTitleView;
-		BTextControl*	fURLBox;
+		BTextView*		fMultiUrlBox;
+		BStringView*	fUrlTitle;
 
 		bool			fAbortedFlag;
 		bool			fGetFlag;
