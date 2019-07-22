@@ -16,6 +16,8 @@
 #include "WorkerThread.h"
 
 #include <Button.h>
+#include <ColumnListView.h>
+#include <ColumnTypes.h>
 #include <Directory.h>
 #include <FilePanel.h>
 #include <Menu.h>
@@ -37,16 +39,16 @@ enum {
 	statERROR			= 'erro',
 	statPLAYING			= 'play',
 
-	msgABORT	= 'abor',
-	msgAUTO		= 'auto',
-	msgCLEAN	= 'clen',
-	msgCLEARURL	= 'curl',
-	msgEDIT		= 'edit',
-	msgFORMAT	= 'form',
-	msgOPENURL	= 'ourl',
-	msgPLAY		= 'ypla',
-	msgSAVE		= 'esav',
-	msgURL		= 'urly',
+	msgABORT		= 'abor',
+	msgADD			= 'addu',
+	msgAUTO			= 'auto',
+	msgCLEAN		= 'clen',
+	msgCLEARLIST	= 'cler',
+	msgEDIT			= 'edit',
+	msgFORMAT		= 'form',
+	msgPLAY			= 'ypla',
+	msgSAVE			= 'esav',
+	msgSTART		= 'star',
 
 	FOLDER_SELECT_MESSAGE = 'fsel',
 	SELECT_THIS_DIR_MESSAGE = 'sdir'
@@ -66,32 +68,27 @@ private:
 		void			_BuildLayout();
 
 		status_t		WatchMonitoredSitesList();
-		bool			GetClip();
-		void			GetTitle();
+		bool			GetClip(BString url, WorkerThread* wt);
+		void			GetTitle(BString url, WorkerThread* wt);
 		void			KillThread(char* command);
 		void			ResetFlags();
 		void			SetStatus(BString text);
-		void			TruncateTitle();
 		void			URLofFile(entry_ref &ref);
 
 		void			PlayClip();
 		void			SaveClip();
 
 private:
-		BButton*		fAbortButton;
-		BButton*		fPlayButton;
+		BButton*		fAddButton;
 		BButton*		fSaveButton;
 
 		BFilePanel*		fSaveFilePanel;
 
 		BMenuBar*		fMenuBar;
-		BMenuItem*		fAbortMenu;
 		BMenuItem*		fAutoMenu;
 		BMenuItem*		fCleanMenu;
 		BMenuItem*		fPlayMenu;
 		BMenuItem*		fSaveMenu;
-		BMenuItem*		fClearURLMenu;
-		BMenuItem*		fOpenURLMenu;
 		
 		BOptionPopUp*	fFormatOption;
 
@@ -101,10 +98,11 @@ private:
 		BString*		fTempDir;
 		BString*		fURL;
 
-		BStringView*	fStatusView;
-		BStringView*	fTitleView;
 		BTextView*		fMultiUrlBox;
 		BStringView*	fUrlTitle;
+		BStringView*	fDownloadsTitle;
+		
+		BColumnListView*	fDownloadsView;
 
 		bool			fAbortedFlag;
 		bool			fGetFlag;

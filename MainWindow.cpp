@@ -27,8 +27,10 @@
 #include <Screen.h>
 #include <Size.h>
 #include <String.h>
+#include <StringList.h>
 #include <SupportDefs.h>
 #include <View.h>
+#include <Url.h>
 
 #include <signal.h>
 #include <stdlib.h>
@@ -84,11 +86,11 @@ MainWindow::MainWindow()
 	_BuildLayout();
 
 	fMultiUrlBox->MakeFocus(true);
-	fPlayButton->MakeDefault(true);
+	fAddButton->MakeDefault(true);
 
 	if (fSettings.WindowPosition() == BRect(-1, -1, -1, -1)) {
 		CenterOnScreen();
-		ResizeTo(400, 150);
+		ResizeTo(700, 250);
 	} else {
 		BRect frame = fSettings.WindowPosition();
 		MoveTo(frame.LeftTop());
@@ -119,10 +121,6 @@ MainWindow::_BuildMenu()
 		new BMessage(msgSAVE), 'S'));
 	fSaveMenu->SetEnabled(false);
 
-	menu->AddItem(fAbortMenu = new BMenuItem(B_TRANSLATE("Abort download"),
-		new BMessage(msgABORT)));
-	fAbortMenu->SetEnabled(false);
-
 	menu->AddSeparatorItem();
 	menu->AddItem(item = new BMenuItem(B_TRANSLATE("About UberTuber"),
 		new BMessage(B_ABOUT_REQUESTED)));
@@ -132,13 +130,9 @@ MainWindow::_BuildMenu()
 		'Q'));
 	fMenuBar->AddItem(menu);
 	
-	menu = new BMenu(B_TRANSLATE("URL"));
-	menu->AddItem(item = fClearURLMenu = new BMenuItem(B_TRANSLATE("Clear URL field"),
-		new BMessage(msgCLEARURL), 'D'));
-	fClearURLMenu->SetEnabled(false);
-	menu->AddItem(item = fOpenURLMenu = new BMenuItem(B_TRANSLATE("Open URL in browser"),
-		new BMessage(msgOPENURL), 'O'));
-	fOpenURLMenu->SetEnabled(false);
+	menu = new BMenu(B_TRANSLATE("Downloads"));
+	menu->AddItem(item = new BMenuItem(B_TRANSLATE("Clear downloads list"),
+		new BMessage(msgCLEARLIST), 'C'));
 	fMenuBar->AddItem(menu);
 
 	menu = new BMenu(B_TRANSLATE("Settings"));
@@ -160,25 +154,19 @@ MainWindow::_BuildLayout()
 {
 	fUrlTitle = new BStringView("urltitle", B_TRANSLATE("Paste URL(s) here"));
 	fMultiUrlBox = new BTextView("multiurlbox");
-	
-	fTitleView = new BStringView("title", " ");
-	fTitleView->SetFontSize(be_plain_font->Size() - 2);
-	fTitleView->SetHighColor(tint_color(ui_color(B_CONTROL_TEXT_COLOR), 0.7));
 
-	fStatusView = new BStringView("status", " ");
-	fStatusView->SetFontSize(be_plain_font->Size() - 2);
-	fStatusView->SetHighColor(tint_color(ui_color(B_CONTROL_TEXT_COLOR), 0.7));
+	fDownloadsTitle = new BStringView("downloadstitle", B_TRANSLATE("Downloads"));
+	fDownloadsView = new BColumnListView("downloadsview", 0);
+	fDownloadsView->AddColumn(new BStringColumn(B_TRANSLATE("Name"), 100, 100, 100, 10), 0);
+	fDownloadsView->AddColumn(new BStringColumn(B_TRANSLATE("Format"), 100, 100, 100, 10), 1);
+	fDownloadsView->AddColumn(new BStringColumn(B_TRANSLATE("Status"), 100, 100, 100, 10), 2);
 
-	fAbortButton = new BButton("abortbutton", B_TRANSLATE("Abort download"),
-		new BMessage(msgABORT));
-	fAbortButton->SetEnabled(false);
-	
 	fFormatOption = new BOptionPopUp("formatoption", B_TRANSLATE("Format"), new BMessage(msgFORMAT));
 	fFormatOption->AddOptionAt(B_TRANSLATE("default"), 0, 0);
 	fFormatOption->AddOptionAt(B_TRANSLATE("Audio only"), BEST_AUDIO, 1);
 
-	fPlayButton = new BButton("playbutton", B_TRANSLATE("Play"), new BMessage(msgPLAY));
-	fPlayButton->SetEnabled(false);
+	fAddButton = new BButton("addbutton", B_TRANSLATE("Add"), new BMessage(msgADD));
+	fAddButton->SetEnabled(true);
 
 	fSaveButton = new BButton("savebutton", B_TRANSLATE("Save as" B_UTF8_ELLIPSIS),
 		new BMessage(msgSAVE));
@@ -197,24 +185,22 @@ MainWindow::_BuildLayout()
 			.Add(fMultiUrlBox)
 			.SetInsets(spacing, 0, spacing, 0)
 		.End()
-		.AddGroup(B_HORIZONTAL, 0)
-			.AddStrut(font.StringWidth("URL:") + be_control_look->DefaultLabelSpacing())
-			.Add(fTitleView)
-			.AddStrut(spacing)
-			.AddGlue()
-			.Add(fStatusView)
+		.AddGroup(B_HORIZONTAL, spacing)
+			.Add(fDownloadsTitle)
+			.SetInsets(spacing, spacing, spacing, 0)
+		.End()
+		.AddGroup(B_HORIZONTAL, spacing)
+			.Add(fDownloadsView)
 			.SetInsets(spacing, 0, spacing, 0)
 		.End()
 		.AddGroup(B_HORIZONTAL, 0)
 			.AddStrut(font.StringWidth("URL:") + be_control_look->DefaultLabelSpacing())
-			.Add(fAbortButton)
-			.AddStrut(spacing)
 			.Add(fFormatOption)
 			.AddStrut(spacing * 4)
 			.AddGlue()
 			.Add(fSaveButton)
 			.AddStrut(spacing)
-			.Add(fPlayButton)
+			.Add(fAddButton)
 			.SetInsets(spacing, 0, spacing, spacing / 2)
 		.End();
 }
@@ -324,7 +310,6 @@ MainWindow::MessageReceived(BMessage* msg)
 	 	 		SaveClip();
 	 	 	else if (!fGetFlag && !fGotClipFlag) {
 	 	 		fSaveIt = true;
-	 	 	 	GetClip();
 	 	 	} else
 	 	 		fSaveIt = true;
 
@@ -350,8 +335,7 @@ MainWindow::MessageReceived(BMessage* msg)
 	 	 	if (fGotClipFlag)
 	 	 		SaveClip();
 	 	 	else if (!fGetFlag && !fGotClipFlag) {
-	 	 		fSaveIt = true;
-	 	 	 	GetClip();
+	 	 		fSaveIt = true;;
 	 	 	} else
 	 	 		fSaveIt = true;
 
@@ -367,10 +351,43 @@ MainWindow::MessageReceived(BMessage* msg)
 			fAutoMenu->SetMarked(fSettings.StateAuto());
 			break;
 		}
+		case msgADD:
+		{
+			BStringList wordList, wordList2;
+			BUrl* url;
+			BString* buffer = new BString(fMultiUrlBox->Text());
+			buffer->Split("\n", true, wordList);
+			for (int32 i = 0; i < wordList.CountStrings(); i++)
+			{
+				wordList.StringAt(i).Split(" ", true, wordList2);
+				for (int32 x = 0; x < wordList2.CountStrings(); x++) {
+					url = new BUrl(wordList2.StringAt(x));
+					if (url->IsValid() == true) {
+						BRow* row = new BRow();
+						row->SetField(new BStringField(url->UrlString().String()), 0);
+						row->SetField(new BStringField("default"), 1);
+						row->SetField(new BStringField("Downloading"), 2);
+						fDownloadsView->AddRow(row);
+					}
+					delete url;
+				}
+				wordList2.MakeEmpty();
+			}
+			
+			fMultiUrlBox->SetText("");
+			PostMessage(msgSTART);
+			
+			break;
+		}
 		case msgCLEAN:
 		{
 			fSettings.SetStateClear(!fSettings.StateClear());
 			fCleanMenu->SetMarked(fSettings.StateClear());
+			break;
+		}
+		case msgCLEARLIST:
+		{
+			fDownloadsView->Clear();
 			break;
 		}
 		case msgEDIT:
@@ -419,17 +436,12 @@ MainWindow::MessageReceived(BMessage* msg)
 			KillThread("ps -o Id Team | grep python | grep youtube-dl | awk '{ print $1; }' ; exit");
 			KillThread("ps -o Id Team | grep hey | grep UberTuber | awk '{ print $1; }' ; exit");
 						
-			SetStatus(B_TRANSLATE("Aborted"));
 			printf("Download aborted\n");
 
-			fAbortMenu->SetEnabled(false);
-			fAbortButton->SetEnabled(false);
-
-			fPlayButton->SetEnabled(true);
+			fAddButton->SetEnabled(true);
 			fSaveButton->SetEnabled(true);
 			fPlayMenu->SetEnabled(true);
 			fSaveMenu->SetEnabled(true);
-			//fMultiUrlBox->SetEnabled(true);
 			ResetFlags();
 			fAbortedFlag = true;
 			break;
@@ -439,10 +451,11 @@ MainWindow::MessageReceived(BMessage* msg)
 			fURL = new BString(fMultiUrlBox->Text());
 			
 			if (!fGetFlag && !fGotClipFlag)
-				GetClip();
+			{
+			}
 
 			PlayClip();
-			fPlayButton->SetEnabled(false);
+			fAddButton->SetEnabled(false);
 			fPlayMenu->SetEnabled(false);
 			break;
 		}
@@ -456,111 +469,72 @@ MainWindow::MessageReceived(BMessage* msg)
 			}
 			break;
 		}
-		case msgURL:
+		case msgSTART:
 		{
-			if (!fGetFlag) {
-				int state = (fMultiUrlBox->TextLength() > 0) ? true : false;
-				fPlayButton->SetEnabled(state);
-				fSaveButton->SetEnabled(state);
-				fPlayMenu->SetEnabled(state);
-				fSaveMenu->SetEnabled(state);
-				fClearURLMenu->SetEnabled(state);
-				fOpenURLMenu->SetEnabled(state);				
-
-				SetStatus("");
-				fTitleView->SetText("");
-				printf("URL changed:\n");
-
-				ResetFlags();
-			}
-			break;
+			for (int i = 0; i < fDownloadsView->CountRows(); i++) {
+				BStringField* field = (BStringField*) fDownloadsView->RowAt(i)->GetField(0);
+				WorkerThread* workerThread = new WorkerThread(this);
+				GetClip(field->String(), workerThread);
+			}		
 		}
 		case msgTITLE:
 		{
-			if (msg->FindString("title", &fClipTitle) == B_OK)
-				TruncateTitle();
+			msg->FindString("title", &fClipTitle);
 			if (fClipTitle.FindFirst("ERROR: YouTube said:") == 0) {
 				PostMessage(msgABORT);
 			}
-			break;
-		}
-		case msgCLEARURL:
-		{
-			fMultiUrlBox->SetText("");
-			break;
-		}
-		case msgOPENURL:
-		{
-			BString command("open %URL%");
-			command.ReplaceAll("%URL%", fMultiUrlBox->Text());
-			system(command);
 			break;
 		}
 
 		// React to messages from 'hey', forwarded from App
 		case statBUFFER:
 		{
-			SetStatus(B_TRANSLATE("Buffering" B_UTF8_ELLIPSIS));
 			break;
 		}
 		case statDOWNLOAD:
 		{
-			SetStatus(B_TRANSLATE("Downloading" B_UTF8_ELLIPSIS));
 			break;
 		}
 		case statERROR:
 		{
-			if (!fAbortedFlag)
-				SetStatus(B_TRANSLATE("Download failed"));
-			else {
-				SetStatus(B_TRANSLATE("Aborted"));
-				fAbortMenu->SetEnabled(false);
-				fAbortButton->SetEnabled(false);
+			if (!fAbortedFlag) {
 			}
-			//fMultiUrlBox->SetEnabled(true);
+			else {
+			}
 			ResetFlags();
 			break;
 		}
 		case statFINISH_GET:
 		{
 			if (!fPlayingFlag && !fAbortedFlag)
-				SetStatus(B_TRANSLATE("Download finished"));
-			fAbortButton->SetEnabled(false);
-			fAbortMenu->SetEnabled(false);
 			fGetFlag = false;
 			fGotClipFlag = true;
 			if (fSaveIt)
 				SaveClip();
-			//fMultiUrlBox->SetEnabled(true);
 			break;
 		}
 		case statFINISH_PLAY:
 		{
 			if (!fGetFlag)
-				SetStatus(B_TRANSLATE("Playback finished"));
 			if (fGetFlag && fSaveIt)
-				SetStatus(B_TRANSLATE("Downloading" B_UTF8_ELLIPSIS));
 			if (fGetFlag && !fSaveIt) {
-				SetStatus(B_TRANSLATE("Aborted"));
 				fAbortedFlag = true;
 				KillThread("ps -o Id Team | grep python | grep youtube-dl | awk '{ print $1; }' ; exit");
 				KillThread("ps -o Id Team | grep hey | grep UberTuber | awk '{ print $1; }' ; exit");
 			}
 			if (fAbortedFlag) {
-				SetStatus(B_TRANSLATE("Aborted"));
 				fGotClipFlag = false;
 			}
 			if (fGotClipFlag)
 				fPlayedFlag = true;
 
 			fPlayingFlag = false;
-			fPlayButton->SetEnabled(true);
+			fAddButton->SetEnabled(true);
 			fPlayMenu->SetEnabled(true);		
 			break;
 		}
 		case statFINISH_SAVE:
 		{
-			SetStatus(B_TRANSLATE("Saving complete"));
 			fSaveButton->SetEnabled(true);
 			fSaveMenu->SetEnabled(true);
 			fSavedFlag = true;
@@ -569,9 +543,6 @@ MainWindow::MessageReceived(BMessage* msg)
 		case statPLAYING:
 		{
 			fPlayingFlag = true;
-			fAbortButton->SetEnabled(true);
-			fAbortMenu->SetEnabled(true);
-			SetStatus(B_TRANSLATE("Playing" B_UTF8_ELLIPSIS));
 			break;
 		}
 		default:
@@ -625,19 +596,6 @@ MainWindow::QuitRequested()
 void
 MainWindow::FrameResized(float width, float height)
 {
-		TruncateTitle();
-}
-
-
-void
-MainWindow::TruncateTitle()
-{
-	float widthURL(fMultiUrlBox->Bounds().Width());
-	BString* title = new BString(fClipTitle);
-	fTitleView->TruncateString(title, B_TRUNCATE_END, widthURL - 120.0);
-	fTitleView->SetText(title->String());
-	
-	return;
 }
 
 void
@@ -649,12 +607,12 @@ MainWindow::URLofFile(entry_ref &ref)
 	ssize_t readBytes;
 
 	readBytes = node.ReadAttr("META:url", B_STRING_TYPE, 0, buffer, bufferSize);
-	if (readBytes < 1)
-		SetStatus(B_TRANSLATE("No URL found"));
+	if (readBytes < 1) {
+	}
 	else {
 		fMultiUrlBox->SetText(buffer);
 		if (!fGetFlag) {
-			fPlayButton->SetEnabled(true);
+			fAddButton->SetEnabled(true);
 			fSaveButton->SetEnabled(true);
 			fPlayMenu->SetEnabled(true);
 			fSaveMenu->SetEnabled(true);
@@ -710,15 +668,6 @@ MainWindow::ResetFlags()
 	return;
 }
 
-
-void
-MainWindow::SetStatus(BString text)
-{
-	fStatusView->SetText(text.String());
-	return;
-}
-
-
 void
 MainWindow::SetURL(BString* url)
 {
@@ -730,35 +679,31 @@ MainWindow::SetURL(BString* url)
 // #pragma mark -
 
 void
-MainWindow::GetTitle()
+MainWindow::GetTitle(BString url, WorkerThread* wt)
 {
 	BMessage msg(msgGETTITLE);
-	msg.AddString("url", fURL->String());
-	fWorkerThread->Looper()->PostMessage(&msg, fWorkerThread);
+	msg.AddString("url", url.String());
+	wt->Looper()->PostMessage(&msg, wt);
 
 	return;
 }
 
 
 bool
-MainWindow::GetClip()
+MainWindow::GetClip(BString url, WorkerThread* wt)
 {
 	if (fSavedFlag || fPlayedFlag)
 		return true;
 
-	GetTitle();
+	GetTitle(url, wt);
 	
 	BMessage msg(msgGETCLIP);
-	msg.AddString("url", fURL->String());
+	msg.AddString("url", url.String());
 	msg.AddInt32("format", fFormatOption->SelectedOption());
-	fWorkerThread->Looper()->PostMessage(&msg, fWorkerThread);
+	wt->Looper()->PostMessage(&msg, wt);
 
 	fGetFlag = true;
 
-	fAbortButton->SetEnabled(fSaveIt);
-	fAbortMenu->SetEnabled(fSaveIt);
-
-	//fMultiUrlBox->SetEnabled(false);
 	return true;
 }
 
